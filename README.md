@@ -64,11 +64,11 @@ While the project starts small, the long-term aim is to understand and recreate 
 
 * Target architecture: **x86_64**
 * Primary testing environment: **QEMU virtual machine**
-* Build environment: **Linux / Artix Linux**
+* Build environment: **Linux / Artix Linux (Arch-based Distro)**
 * Development approach: incremental and modular
 
 ---
 
 # Disclaimer
 
-Project Liberty is an educational and experimental operating system project intended for learning purposes, research, and systems programming experience.
+Project Liberty is an educational and experimental operating system project intended for learning purposes, research, and systems programming experience. The operating system is currently not available for mainstream release.
