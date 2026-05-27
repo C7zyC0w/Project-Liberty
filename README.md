@@ -20,6 +20,8 @@ Initially, the OS will use an existing bootloader solution for reliability and c
 * **GRUB** — widely supported and highly compatible
 * **Limine** — modern, lightweight, and easier for hobby OS development
 
+I have chosen **GRUB 2** as the current bootloader due to its great support, and large compatability.
+
 In the future, I may develop a completely custom bootloader written in Assembly for deeper hardware-level control and understanding.
 
 ---
