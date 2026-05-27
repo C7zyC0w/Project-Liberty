@@ -4,7 +4,8 @@ SECTIONS
 {
     . = 1M;
 
-    .multiboot : { *(.multiboot) }
+    .multiboot2 : { *(.multiboot2) }
+
     .text : { *(.text*) }
     .rodata : { *(.rodata*) }
     .data : { *(.data*) }
