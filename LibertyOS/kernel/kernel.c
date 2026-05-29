@@ -1,3 +1,5 @@
+// LibertyOS Kernel Version: 0.3
+
 #include <stdint.h>
 
 
@@ -156,7 +158,7 @@ void kernel_main() {
     
     hide_hw_cursor();
     
-    const char msg[] = "========== LibertyOS Version: Pre-Alpha ==========";
+    const char msg[] = "========== LibertyOS: Kernel v0.3 (Pre-Alpha)  ==========";
     
     print_str(msg);
     print_str("\n\n\n>>> ");
