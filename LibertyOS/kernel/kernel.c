@@ -49,6 +49,10 @@ char input_buf[256];
 int buf_len = 0;
 int buf_cursor = 0;
 
+int cursor_col = 0;
+int cursor_row = 0;
+
+
 static inline void outb(uint16_t port, uint8_t value) {  
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
@@ -72,12 +76,16 @@ static inline uint8_t inb(uint16_t port) {
     return result;
 }
 
-uint8_t user_input() {
-    if ((inb(0x64) & 1 )== 1) {
+uint16_t user_input() {
+    if ((inb(0x64) &1) ==1) {
         uint8_t input = inb(0x60);
+        if (input == 0xE0) {
+            while ((inb(0x64) &1) !=1) {}
+            uint16_t input1 = inb(0x60);
+            return (0xE0 << 8) | input1;
+        }   
         return input;
     } else {return 0;}
-    
 }
 
 void print_str(const char* msg) {
@@ -96,22 +104,48 @@ void print_str(const char* msg) {
     }
 }
 
+void insert_char(char c) {
+    for (int i = buf_len; i >= buf_cursor; i--) {
+        input_buf[i+1] = input_buf[i];
+    }
+    input_buf[buf_cursor] = c;
+    buf_cursor++;
+    buf_len++;
+}
+
+void render_input() {
+    col = input_col;
+    for (int i = 0; i < buf_len; i++) {
+        vga[(row*80) + col] = (uint16_t)((0x0F << 8) | (uint8_t) input_buf[i]);
+        col++;
+    }
+    while (col < (input_col + 76)) {
+        vga[(row*80) +col] = (uint16_t)((0x0F << 8) | ' ');
+        col++;
+    }
+}
+
 void print_char(char c) {
     if (c == '\n') {
         row++;
         col=0;
         return;
     }
-    vga[(row * 80) + col] = (uint16_t)((0x0F << 8) | (uint8_t)c);
-    col++;
+    insert_char(c);
+    render_input();
+    col = input_col + buf_cursor;
 }
 
 void draw_cursor() {
-    vga[(row * 80) + col] = (uint16_t)((0x0F << 8) | 0xDB);
+    uint16_t cell = vga[(cursor_row * 80) +cursor_col];
+    uint8_t ch = cell & 0xFF;
+    vga[(cursor_row * 80) + cursor_col] = (uint16_t)((0xF0 << 8) | ch);
 }
 
 void erase_cursor() {
-    vga[(row * 80) + col] = (uint16_t)((0x0F << 8) | ' ');
+    uint16_t cell = vga[(cursor_row * 80) +cursor_col];
+    uint8_t ch = cell & 0xFF;
+    vga[(cursor_row * 80) + cursor_col] = (uint16_t)((0x0F << 8) | ch);
 }
 
 void kernel_main() {
@@ -127,13 +161,18 @@ void kernel_main() {
     print_str(msg);
     print_str("\n\n\n>>> ");
     input_col = col;
+    
+    cursor_col = col;
+    cursor_row = row;
     draw_cursor();
     
     
     while (1) {
-        uint8_t key = user_input();
+        uint16_t key = user_input();
         char c = scancode_to_char(key);
+       
         
+        // Cursor Blink.
         j++;
         if (j >= 4000000) {
             if (cursor_status == 0) {
@@ -146,20 +185,71 @@ void kernel_main() {
             j = 0;
         }     
         
-        if (key == 0x0E && col > input_col) {
+        // Backspace.
+        if (key == 0x0E && buf_cursor > 0) {
             erase_cursor();
-            col--;
-            vga[(row * 80) + col] = (uint16_t)((0x0F << 8) | ' ');
+            buf_cursor--;
+            for (int i = buf_cursor; i < buf_len; i++) {
+               input_buf[i] = input_buf[i+1]; 
+            }
+            buf_len--;
+            render_input();
+            col = input_col + buf_cursor;
+            cursor_col = col;
+            cursor_row = row;
             draw_cursor();
+            cursor_status = 1;
             continue;
         } 
-        if (key == 0x0E && col == input_col){
+        if (key == 0x0E && buf_cursor == 0){
             // Add bell.
             continue;
         }
         
+        
         if (key == 0x2A || key == 0x36) shift = 1;
         if (key == 0xAA || key == 0xB6) shift = 0;
+        
+        
+        // Left + Right Arrow Keys.
+        if (key == 0xE04B && buf_cursor > 0) {
+            erase_cursor();
+            buf_cursor--;
+            col = input_col + buf_cursor;
+            cursor_col = col;
+            cursor_row = row;
+            draw_cursor();
+            continue;
+        }
+        if (key == 0xE04D && buf_cursor < buf_len) {
+            erase_cursor();
+            buf_cursor++;
+            col = input_col + buf_cursor;
+            cursor_col = col;
+            cursor_row = row;
+            draw_cursor();
+            continue;
+        }     
+        
+        // Home + End Keys.
+        if (key == 0xE047) {
+            erase_cursor();
+            buf_cursor = 0;
+            col = input_col;
+            cursor_col = col;
+            cursor_row = row;
+            draw_cursor();
+            continue;
+        }
+        if (key == 0xE04F) {
+            erase_cursor();
+            buf_cursor = buf_len;
+            col = input_col + buf_len;
+            cursor_col = col;
+            cursor_row = row;
+            draw_cursor();
+            continue;
+        }
         
         
         if (key >= 0x80 || c == 0) continue;
@@ -167,11 +257,17 @@ void kernel_main() {
         erase_cursor();
         print_char(c);
         
+        // When Return key is pressed.
         if (c == '\n') {
+        buf_len = 0;
+        buf_cursor = 0;
         print_str(">>> ");
         input_col = col;
         }
       
+        // Draw the Cursor.
+        cursor_col = col;
+        cursor_row = row;
         cursor_status =1; draw_cursor();
         
     }
