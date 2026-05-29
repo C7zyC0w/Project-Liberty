@@ -73,4 +73,4 @@ While the project starts small, the long-term aim is to understand and recreate 
 
 # Disclaimer
 
-Project Liberty is an educational and experimental operating system project intended for learning purposes, research, and systems programming experience. The operating system is currently not available for mainstream release.
+Project Liberty is currently unfinished, and is not available for mainstream release as of now.
