@@ -1,15 +1,19 @@
-// LibertyOS Kernel Version: 0.3
+// LibertyOS Kernel Version: 0.4
 
 #include <stdint.h>
 
 
 volatile uint16_t* vga = (volatile uint16_t*)0xB8000;
 
+
 int row = 0;
 int col = 0;
 int input_col = 0;
-int shift = 0;
 
+int shift = 0;
+int ctrl = 0;
+
+//ASCII Table
 const char scancode_table[128] = {
     [0x01]=0,     // Escape.
     [0x02]='1', [0x03]='2', [0x04]='3', [0x05]='4',
@@ -30,6 +34,7 @@ const char scancode_table[128] = {
     [0x34]='.', [0x35]='/', [0x39]=' ' // Space.
 };
 
+//ASCII Table (Shift)
 const char scancode_table_shift[128] = {
     [0x02]='!', [0x03]='@', [0x04]='#', [0x05]='$',
     [0x06]='%', [0x07]='^', [0x08]='&', [0x09]='*',
@@ -55,6 +60,12 @@ int cursor_col = 0;
 int cursor_row = 0;
 
 
+#define HISTORY_MAX 10
+char history[HISTORY_MAX][256];
+int history_len = 0;
+int history_index = 0;
+int history_max = HISTORY_MAX;
+
 static inline void outb(uint16_t port, uint8_t value) {  
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
@@ -65,11 +76,12 @@ void hide_hw_cursor() {
     outb(0x3D5, 0x20);
 }
 
-
+// Shift Handler:
 char scancode_to_char(uint8_t scancode) {
     if (shift) return scancode_table_shift[scancode];
     return scancode_table[scancode];
 }
+
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t result;
@@ -77,6 +89,21 @@ static inline uint8_t inb(uint16_t port) {
     __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
+
+void auto_scroll() {
+    if (row >= 25) {
+        for (int i = 0; i < 24; i++) {
+            for (int k = 0; k < 80; k++) {
+                vga[i * 80 + k] = vga[(i+1) * 80 + k];
+            }
+        }
+        for (int k = 0; k < 80; k++) {
+            vga[24 * 80 + k] = 0x0F20;
+        }
+        row = 24;
+    }
+}
+
 
 uint16_t user_input() {
     if ((inb(0x64) &1) ==1) {
@@ -95,6 +122,7 @@ void print_str(const char* msg) {
         if (msg[i] == '\n') {
             row++;
             col = 0;
+            auto_scroll();
             continue;
         }
         vga[(row * 80) + col] = (uint16_t)((0x0F << 8) | (uint8_t)msg[i]);
@@ -131,6 +159,7 @@ void print_char(char c) {
     if (c == '\n') {
         row++;
         col=0;
+        auto_scroll();
         return;
     }
     insert_char(c);
@@ -150,15 +179,54 @@ void erase_cursor() {
     vga[(cursor_row * 80) + cursor_col] = (uint16_t)((0x0F << 8) | ch);
 }
 
+// Clear Command Checker:
+int str_eq(const char* a, const char* b) {
+    for (int i = 0; a[i] || b[i]; i++){
+        if (a[i] != b[i]) return 0;
+    }
+    return 1;
+}
+
+// Echo Command Checker:
+int str_starts_with(const char* str, const char* prefix) {
+    for (int i = 0; prefix[i] != '\0'; i++){
+        if (str[i] != prefix[i]) return 0;
+    }
+    return 1;
+}
+
+//FastFetch Command Checker.
+void print_str_color(const char* msg, uint8_t color) {
+    for (int i = 0; msg[i] != '\0'; i++) {
+        if (msg[i] == '\n') {
+            row++;
+            col = 0;
+            auto_scroll();
+            continue;
+        }
+        vga[(row * 80) + col] = (uint16_t)((color << 8) | (uint8_t)msg[i]);
+        if (col >= 80) {
+            row++;
+            col = 0;
+        }
+        col++;
+    }
+}
+
+
 void kernel_main() {
+    int i = 0;
     int j = 0;
+    int k = 0;
+
     int cursor_status = 0;
 
-    for (int i = 0; i < 80 * 25; i++) vga[i] = 0x0F20;
+    // Clear Screen.
+    for (i = 0; i < 80 * 25; i++) vga[i] = 0x0F20;
     
     hide_hw_cursor();
     
-    const char msg[] = "========== LibertyOS: Kernel v0.3 (Pre-Alpha)  ==========";
+    const char msg[] = "========== LibertyOS: Kernel v0.4 (Pre-Alpha)  ==========";
     
     print_str(msg);
     print_str("\n\n\n>>> ");
@@ -191,7 +259,7 @@ void kernel_main() {
         if (key == 0x0E && buf_cursor > 0) {
             erase_cursor();
             buf_cursor--;
-            for (int i = buf_cursor; i < buf_len; i++) {
+            for (i = buf_cursor; i < buf_len; i++) {
                input_buf[i] = input_buf[i+1]; 
             }
             buf_len--;
@@ -209,8 +277,28 @@ void kernel_main() {
         }
         
         
+        // Shift keys:
         if (key == 0x2A || key == 0x36) shift = 1;
         if (key == 0xAA || key == 0xB6) shift = 0;
+        
+        // Control keys:
+        if (key == 0x1D || key == 0xE01D) ctrl = 1;
+        if (key == 0x9D || key == 0xE09D) ctrl = 0;
+        
+        // Control Handler:
+        if (ctrl && key == 0x2E) {
+            erase_cursor();
+            buf_len = 0;
+            buf_cursor = 0;
+            input_buf[0] = '\0';
+            print_str("\n^C\n>>> ");
+            input_col = col;
+            cursor_col = col;
+            cursor_row = row;
+            draw_cursor();
+            cursor_status = 1;
+            continue;
+        }
         
         
         // Left + Right Arrow Keys.
@@ -254,23 +342,138 @@ void kernel_main() {
         }
         
         
+        // Up + Dn Arrows:
+        if (key == 0xE048) {
+            erase_cursor();
+            if (history_index > 0) {
+                history_index--;
+                i = 0;
+                for (i = 0; history[history_index][i] != '\0'; i++) {
+                    input_buf[i] = history[history_index][i];
+                }
+                input_buf[i] = '\0';
+                buf_len = i;
+                buf_cursor = buf_len;
+                render_input();
+                col = input_col + buf_cursor;
+                cursor_col = col;
+                cursor_row = row;
+                draw_cursor();
+            }
+            continue;
+        }
+        if (key == 0xE050) {
+            erase_cursor();
+            if (history_index < history_len) {
+                history_index++;
+                i = 0;
+                for (i = 0; history[history_index][i] != '\0'; i++) {
+                    input_buf[i] = history[history_index][i];
+                }
+                input_buf[i] = '\0';
+                buf_len = i;
+                buf_cursor = buf_len;
+                render_input();
+                col = input_col + buf_cursor;
+                cursor_col = col;
+                cursor_row = row;
+                draw_cursor();
+            } else {
+                buf_len = 0;
+                buf_cursor = 0;
+                input_buf[0] = '\0';
+                render_input();
+                col = input_col;
+                cursor_col = col;
+                cursor_row = row;
+                draw_cursor();
+            }
+            continue;
+        }
+        
+        
         if (key >= 0x80 || c == 0) continue;
         
-        erase_cursor();
-        print_char(c);
         
         // When Return key is pressed.
         if (c == '\n') {
-        buf_len = 0;
-        buf_cursor = 0;
-        print_str(">>> ");
-        input_col = col;
+            // Command Handler:
+            erase_cursor();
+            input_buf[buf_len] = '\0';
+            // Clear Command:
+            if (str_eq(input_buf, "clear")) {
+                row = 0; col = 0;
+                for (i = 0; i < 80 * 25; i++) vga[i] = 0x0F20;
+                
+                print_str(">>> ");
+            // Echo Command:
+            } else if (str_starts_with(input_buf, "echo ")){
+                print_str("\n");
+                print_str(input_buf + 5);
+                print_str("\n>>> ");
+            // Reboot Command:
+            } else if (str_eq(input_buf, "reboot")) {
+                outb(0x64, 0xFE);
+            //Fast Fetch Command + ASCII Art:
+            } else if (str_eq(input_buf, "ff") || str_eq(input_buf, "fastfetch")) {
+                print_str("\n");
+                print_str_color("        ___deeply___        ", 0x0B);
+                print_str_color("    LibertyOS", 0x0F); print_str("\n");
+                print_str_color("       /  flame  \\      ", 0x0E);
+                print_str_color("    ---------", 0x08); print_str("\n");
+                print_str_color("      | torch |        ", 0x0B);
+                print_str_color("OS: ", 0x0A); print_str_color("LibertyOS Pre-Alpha", 0x0F); print_str("\n");
+                print_str_color("      |  /\\  |         ", 0x0B);
+                print_str_color("Kernel: ", 0x0A); print_str_color("v0.4", 0x0F); print_str("\n");
+                print_str_color("    __|_/  \\_|__       ", 0x0B);
+                print_str_color("Arch: ", 0x0A); print_str_color("x86 32-bit", 0x0F); print_str("\n");
+                print_str_color("   |  Liberty   |      ", 0x0B);
+                print_str_color("Shell: ", 0x0A); print_str_color("LibertyShell v0.4", 0x0F); print_str("\n");
+                print_str_color("   |    face    |      ", 0x0B);
+                print_str_color("Build: ", 0x0A); print_str_color("Pre-Alpha", 0x0F); print_str("\n");
+                print_str_color("   |___________|      ", 0x0B); print_str("\n");
+                print_str_color("        |||           ", 0x0B); print_str("\n");
+                print_str_color("       =====          ", 0x07); print_str("\n");
+                print_str("\n>>> ");
+            } else {
+                print_str("\nCommand not found! Please check your spelling and try again.\n>>> ");
+            }
+            
+            // Save the Command to History Logic:
+            if (history_len < history_max) {
+                for (i = 0; input_buf[i] != '\0'; i++) {
+                    history[history_len][i] = input_buf[i];
+                }
+                history[history_len][i] = '\0';
+                history_len++;
+                history_index = history_len;
+            } else {
+                for (i = 0; i < history_max -1; i++) {
+                    for (k = 0; history[i+1][k] != '\0'; k++) {
+                        history[i][k] = history[i+1][k];
+                    }
+                    history[i][k] = '\0';
+                }
+                for (k = 0; input_buf[k] != '\0'; k++) {
+                    history[history_max -1][k] = input_buf[k];
+                }
+                history[history_max -1][k] = '\0';
+                history_index = history_max;
+            }
+            buf_len = 0;
+            buf_cursor = 0;
+            input_col = col;
+            
+        } else {
+            erase_cursor();
+            print_char(c);
         }
+        
+
       
         // Draw the Cursor.
         cursor_col = col;
         cursor_row = row;
-        cursor_status =1; draw_cursor();
-        
+        cursor_status =1; draw_cursor();        
     }
 }
