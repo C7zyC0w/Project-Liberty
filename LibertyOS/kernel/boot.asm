@@ -18,6 +18,7 @@ start:
     mov byte [0xB8000], 'A'
     mov byte [0xB8001], 0x0F
 
+    push ebx
     call kernel_main
 
 hang:
