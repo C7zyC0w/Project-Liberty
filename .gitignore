@@ -1,0 +1,51 @@
+# ==========================================
+# 1. OS Dev & Toolchain Artifacts
+# ==========================================
+# Cross-compiler build outputs and libraries
+*.a
+*.o
+*.o.d
+*.d
+ 
+# Linker map files
+*.map
+ 
+# Final bootable images and kernels
+*.bin
+*.elf
+*.iso
+*.img
+ 
+# ==========================================
+# 2. Virtual Machines & Emulators
+# ==========================================
+# QEMU / Bochs / VirtualBox state and log files
+*.log
+bochsout.txt
+*.vmdk
+*.vdi
+*.qcow2
+ 
+# ==========================================
+# 3. Build Systems
+# ==========================================
+# Compiled binaries, build directories, and dependency files
+build/
+bin/
+obj/
+.dep/
+.depend/
+ 
+# ==========================================
+# 4. Text Editors & IDEs
+# ==========================================
+# VS Code
+.vscode/
+ 
+# CLion / IntelliJ
+.idea/
+cmake-build-debug/
+cmake-build-release/
+ 
+# Vim swap files
+*.swp
