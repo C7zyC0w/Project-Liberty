@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 
-// ========== memory.h ==========
 uint32_t get_total_mem_mb(uint32_t* mb_info);
 
 #endif
