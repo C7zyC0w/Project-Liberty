@@ -1,5 +1,10 @@
-// LibertyOS Kernel Version: 0.5
-
+// Licence: GPL-3.0
+/*
+ * Project-Liberty/LibertyOS/kernel/kernel.c
+ *
+ * Copyright: C7zyC0w
+*/
+    
 #include <stdint.h>
 
 
