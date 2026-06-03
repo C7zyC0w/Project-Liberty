@@ -1,13 +1,14 @@
 # Project Liberty / LibertyOS
 
-**Project Liberty** (also referred to as **LibertyOS**) is the codename for a custom Operating System (OS) that I am developing entirely from scratch as an independent project.
+**Project Liberty** (also referred to as **LibertyOS**) is the codename for a custom Operating System that I am developing entirely from scratch as an independent project.
 
 The primary goals of Project Liberty are to:
 
-* Learn low-level computer architecture and kernel development
-* Gain experience with systems programming and hardware interaction
-* Create a lightweight, expandable operating system built with modern C standards
-* Explore how operating systems function internally, from boot to user interaction
+* Learn low-level computer architecture and kernel development.
+* Gain experience with systems programming and hardware interaction.
+* Create a lightweight, expandable operating system built with modern C standards.
+* Explore how operating systems function internally, from boot to user interaction.
+* Create a compatibility layer between mainstream Operating Systems.
 
 ---
 
@@ -30,8 +31,9 @@ In the future, I may develop a completely custom bootloader written in Assembly 
 
 Project Liberty will primarily be written in:
 
-* **C23** — used for kernel and system development
-* **Assembly (x86_64)** — used for low-level boot and hardware-specific functionality
+* **C23** — used for kernel and system development.
+* **Assembly (x86_64)** — used for low-level boot and hardware-specific functionality.
+* **CowLang 1.0** — used for some system kernel packages (will be used when I finish developing CowLang).
 
 The operating system will be developed as a **freestanding environment**, meaning it will not rely on standard operating system libraries provided by existing systems like Linux or Windows.
 
@@ -68,9 +70,10 @@ While the project starts small, the long-term aim is to understand and recreate 
 * Primary testing environment: **QEMU virtual machine**
 * Build environment: **Linux / Artix Linux (Arch-based Distro)**
 * Development approach: incremental and modular
+* Applicatioms used: Visual Studio Code Insiders, CLIDE (CCIDE), Kate, Dolphin, Konsole, QEMU, GitHub, Dekstop, Brave.
 
 ---
 
 # Disclaimer
 
-Project Liberty is currently unfinished, and is not available for mainstream release as of now.
+Project Liberty is currently unfinished, and is NOT YET available for mainstream release.
